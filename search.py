@@ -1,8 +1,14 @@
 
-import os
 import chromadb
 from chromadb.utils import embedding_functions
 import sys
+import ollama
+
+
+EMBEDDING_MODEL = "chroma/all-minilm-l6-v2-f32"
+LLM_MODEL = "gpt-oss:120b-cloud"
+CHROMA_PERSIST_DIR = "chroma_db"
+CHROMA_COLLECTION = "ai_references"
 
 def main():
     """Main function to perform a search in ChromaDB."""
@@ -12,44 +18,51 @@ def main():
 
     query = " ".join(sys.argv[1:])
 
-    # Initialize ChromaDB client with persistence
-    client = chromadb.PersistentClient(path="chroma_db")
-
-    # Use the default embedding function
+    client = chromadb.PersistentClient(path=CHROMA_PERSIST_DIR)
     sentence_transformer_ef = embedding_functions.SentenceTransformerEmbeddingFunction(
         model_name="all-MiniLM-L6-v2"
     )
-
-    # Get the collection
     try:
         collection = client.get_collection(
-            name="ai_references", embedding_function=sentence_transformer_ef
+            name=CHROMA_COLLECTION, embedding_function=sentence_transformer_ef
         )
     except ValueError:
         print("Database not found. Please run ingest.py first.")
         sys.exit(1)
+    response = user_query(query, collection)
+    print(response)
 
+def user_query(query: str, collection: chromadb.Collection) -> str:
+    """Run a similarity query against the ChromaDB collection."""
 
-    # Perform a search
-    import time
-    start_time = time.time()
+    query_embedding = ollama.embeddings(
+        model=EMBEDDING_MODEL, 
+        prompt=query
+    )["embedding"]
+
     results = collection.query(
-        query_texts=[query],
-        n_results=5  # You can adjust the number of results
+        query_embeddings=[query_embedding],
+        n_results=3
     )
-    end_time = time.time()
-    duration = end_time - start_time
 
-    print(f"\nSearch completed in {duration:.4f} seconds.\n")
+    context = "\n\n".join(results['documents'][0])
 
-    if results['documents']:
-        for i, doc in enumerate(results['documents'][0]):
-            print(f"Result {i+1}:")
-            print(f"  Source: {results['metadatas'][0][i]['source']}")
-            print(f"  Content: {doc}")
-            print("-" * 20)
-    else:
-        print("No results found.")
+    prompt = f"""
+    You are a helpful assistant. Use the provided context to answer the question.
+    If the answer isn't in the context, say you don't know.
+
+    Context:
+    {context}
+
+    Question: 
+    {query}
+
+    Answer:
+    """
+
+    # 5. Generate response using your gpt-oss model
+    response = ollama.generate(model=LLM_MODEL, prompt=prompt)
+    return response['response']
 
 if __name__ == "__main__":
     main()
