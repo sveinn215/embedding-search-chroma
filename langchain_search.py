@@ -20,6 +20,7 @@ PDF_DIRECTORY = "AI Reference Pdf"
 MODEL_CONFIG = {
     "nomic-embed-text": {"chunk_size": 1000, "chunk_overlap": 200},
     "chroma/all-minilm-l6-v2-f32": {"chunk_size": 200, "chunk_overlap": 50},
+    "qwen3-embedding:0.6b": {"chunk_size": 200, "chunk_overlap": 50},
 }
 DEFAULT_CHUNK_SIZE = 200
 DEFAULT_CHUNK_OVERLAP = 50
@@ -136,7 +137,7 @@ def main():
     # Search command
     search_parser = subparsers.add_parser("search", help="Perform a search in the vector store.")
     search_parser.add_argument("query", help="The search query.")
-    search_parser.add_argument("--model", default="all-MiniLM-L6-v2", help="The embedding model to use for searching.")
+    search_parser.add_argument("--model", default="qwen3-embedding:0.6b", help="The embedding model to use for searching.")
 
     args = parser.parse_args()
 
